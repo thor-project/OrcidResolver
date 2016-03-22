@@ -46,7 +46,7 @@ public class OrcidResolverTest {
 	private OrcidResolver r = new OrcidResolver();
 
 	@Test
-	public void test1() {
+	public void test1() throws Exception {
 		assertEquals("0000-0002-1900-4162",
 				r.resolve("Schindler", "Uwe", "10.1016/j.cageo.2008.02.023", "10.2481/dsj.5.79", "10.1007/11551362_12",
 						"10.2312/wdc-mare.2005.1", "10.2312/wdc-mare.2005.3", "10.1016/S0098-3004(02)00039-0",
@@ -54,7 +54,7 @@ public class OrcidResolverTest {
 	}
 
 	@Test
-	public void test2() {
+	public void test2() throws Exception {
 		assertEquals("0000-0003-3096-6829",
 				r.resolve("Diepenbroek", "Michael", "10.5194/essd-7-239-2015", "10.1016/j.cageo.2008.02.023",
 						"10.2481/dsj.5.79", "10.2481/dsj.5.79", "10.1007/11551362_12", "10.2312/wdc-mare.2005.1",
@@ -66,30 +66,15 @@ public class OrcidResolverTest {
 	}
 
 	@Test
-	public void test3() {
+	public void test3() throws Exception {
 		assertNull(r.resolve("Schindler", "Uwe", "10.1594/PANGAEA.104840", "10.2312/BzP_0122_1993"));
 	}
 
 	@Test
-	public void test4() {
+	public void test4() throws Exception {
 		// Resolves on "also known as"
 		assertEquals("0000-0002-9567-9460",
 				r.resolve("Draut", "Amy", "10.1016/j.geomorph.2014.08.028", "10.2110/jsr.2013.79"));
 	}
-	
-	@Test
-	public void test5() {
-		assertNull(r.resolve(null, "Uwe", "10.1594/PANGAEA.104840", "10.2312/BzP_0122_1993"));
-	}
-
-	@Test
-	public void test6() {
-		assertNull(r.resolve("Schindler", null, "10.1594/PANGAEA.104840", "10.2312/BzP_0122_1993"));
-	}
-	
-	@Test
-	public void test7() {
-		assertNull(r.resolve("Schindler", "Uwe"));
-	}
-	
+		
 }
