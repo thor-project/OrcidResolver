@@ -11,12 +11,20 @@ The following lines demonstrate the usage of the resolver:
 OrcidResolver r = new OrcidResolver();
 
 // id = 0000-0002-1900-4162
-String id = r.resolve("Schindler", "Uwe", "10.1016/j.cageo.2008.02.023", "10.2481/dsj.5.79", "10.1007/11551362_12",
-  "10.2312/wdc-mare.2005.1", "10.2312/wdc-mare.2005.3", "10.1016/S0098-3004(02)00039-0",
-"10.1594/PANGAEA.854363", "10.1594/PANGAEA.760905", "10.1594/PANGAEA.760907"));
+String id = r.resolve("Schindler", "Uwe",
+  "10.1016/j.cageo.2008.02.023", "10.2481/dsj.5.79", "10.1007/11551362_12",
+  "10.2312/wdc-mare.2005.1", "10.2312/wdc-mare.2005.3",
+  "10.1016/S0098-3004(02)00039-0", "10.1594/PANGAEA.854363",
+  "10.1594/PANGAEA.760905", "10.1594/PANGAEA.760907"));
 ```
-		
-The project also includes an ORCID iD validator. It can be used as follows:
+
+The code is also able to handle names with abbreviated first name. Those are
+detected if all letters of the first name are uppercase, e.g. "Schindler, UH"
+(short for "Schindler, Uwe Horst"). The query to orcid then uses wildcard
+on the first name.
+
+The project also includes an ORCID iD validator that validates the checkum of the
+given ORCID. It can be used as follows:
 
 ```java
 // true
