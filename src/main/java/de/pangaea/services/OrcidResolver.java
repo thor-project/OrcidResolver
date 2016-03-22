@@ -86,7 +86,7 @@ public class OrcidResolver {
 
     final String solrQuery = createSolrQuery(lastName, firstName, dois);
 
-    String ret = null;
+    final String ret;
 
     try {
       URL url = new URL(ORCID_API_URL + ORCID_API_PATH + ORCID_API_QUERY + "&q="
