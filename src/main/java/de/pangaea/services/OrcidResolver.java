@@ -206,11 +206,11 @@ public class OrcidResolver {
     x.setNamespaceContext(new NamespaceContext() {
       @Override
       public String getNamespaceURI(String prefix) {
-        if (prefix == null)
-          throw new IllegalArgumentException("Namespace prefix cannot be null");
+        Objects.requireNonNull(prefix, "Namespace prefix cannot be null");
         String uri = prefixToNS.get(prefix);
-        if (uri == null)
+        if (uri == null) {
           throw new IllegalArgumentException("Undeclared namespace prefix: " + prefix);
+        }
         return uri;
       }
 
