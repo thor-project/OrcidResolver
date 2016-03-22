@@ -32,8 +32,8 @@ import java.util.Map;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
-import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathException;
 import javax.xml.xpath.XPathExpression;
@@ -67,7 +67,7 @@ public class OrcidResolver {
   public static final String ORCID_API_PATH = "/search/orcid-bio/";
   public static final String ORCID_API_QUERY = "?start=0&rows=1&q.op=OR";
 
-  private static final DocumentBuilder docbuilder;
+  private static final DocumentBuilderFactory dbf;
   private static final XPathExpression orcidPath;
   private static final BitSet escapeChars = new BitSet();
 
@@ -86,24 +86,23 @@ public class OrcidResolver {
     final String solrQuery = createSolrQuery(lastName, firstName, dois);
 
     final String ret;
-
     try {
-      URL url = new URL(ORCID_API_URL + ORCID_API_PATH + ORCID_API_QUERY + "&q="
+      final URL url = new URL(ORCID_API_URL + ORCID_API_PATH + ORCID_API_QUERY + "&q="
           + URLEncoder.encode(solrQuery, StandardCharsets.UTF_8.name()));
-      URLConnection connection = url.openConnection();
+      final URLConnection connection = url.openConnection();
       connection.addRequestProperty("Accept", "application/orcid+xml");
-      InputStream in = connection.getInputStream();
-      Document doc = docbuilder.parse(in);
-      ret = orcidPath.evaluate(doc).trim();
-    } catch (SAXException | XPathExpressionException e) {
+      try (final InputStream in = connection.getInputStream()) {
+        synchronized(dbf) {
+          final Document doc = dbf.newDocumentBuilder().parse(in);
+          ret = orcidPath.evaluate(doc).trim();
+        }
+      }
+    } catch (SAXException | XPathExpressionException | ParserConfigurationException e) {
       throw new IllegalStateException("Failed to parse ORCID response.", e);
     }
 
-    if (ret == null) {
-      return null;
-    }
-
     if (ret.isEmpty()) {
+      // no ORCID found
       return null;
     }
 
@@ -157,14 +156,16 @@ public class OrcidResolver {
     solrQuery.append("))");
 
     solrQuery.append(" +digital-object-ids:(");
-    boolean firstDoi = true;
 
+    boolean firstDoi = true;
     for (final String doi : dois) {
-      if (!firstDoi)
+      if (!firstDoi) {
         solrQuery.append(' ');
+      }
       solrQuery.append('"').append(escapeSolrTerm(doi)).append('"');
-      if (solrQuery.length() > 768)
+      if (solrQuery.length() > 768) {
         break;
+      }
     }
 
     solrQuery.append(')');
@@ -189,11 +190,10 @@ public class OrcidResolver {
 
   static {
     try {
-      final DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+      dbf = DocumentBuilderFactory.newInstance();
       dbf.setNamespaceAware(true);
-      docbuilder = dbf.newDocumentBuilder();
     } catch (Exception e) {
-      throw new Error("Failed to instantiate DocumentBuilder", e);
+      throw new Error("Failed to instantiate DocumentBuilderFactory, this may be caused by invalid XML configuration.", e);
     }
 
     final Map<String, String> prefixToNS = new HashMap<>();
@@ -206,7 +206,7 @@ public class OrcidResolver {
       @Override
       public String getNamespaceURI(String prefix) {
         Objects.requireNonNull(prefix, "Namespace prefix cannot be null");
-        String uri = prefixToNS.get(prefix);
+        final String uri = prefixToNS.get(prefix);
         if (uri == null) {
           throw new IllegalArgumentException("Undeclared namespace prefix: " + prefix);
         }
@@ -227,11 +227,10 @@ public class OrcidResolver {
     try {
       orcidPath = x.compile("//orcid:orcid-profile[1]/orcid:orcid-identifier/orcid:path");
     } catch (XPathException e) {
-      throw new Error("Failed to compile XPath", e);
+      throw new Error("Failed to compile XPath, this may be caused by invalid XML configuration.", e);
     }
 
     final String escapes = "+-&|!(){}[]^\"~*?:\\/";
-
     for (int i = 0, c = escapes.length(); i < c; i++) {
       escapeChars.set(escapes.charAt(i));
     }

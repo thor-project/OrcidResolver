@@ -43,7 +43,7 @@ import de.pangaea.services.OrcidResolver;
 
 public class OrcidResolverTest {
 
-	private OrcidResolver r = new OrcidResolver();
+	private final OrcidResolver r = new OrcidResolver();
 
 	@Test
 	public void test1() throws Exception {
