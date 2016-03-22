@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Objects;
 import java.util.Iterator;
 import java.util.Map;
@@ -41,8 +42,6 @@ import javax.xml.xpath.XPathFactory;
 
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
-
-import com.google.common.collect.ImmutableMap;
 
 /**
  * <p>
@@ -197,12 +196,12 @@ public class OrcidResolver {
       throw new Error("Failed to instantiate DocumentBuilder", e);
     }
 
-    final Map<String, String> prefixToNS = ImmutableMap.of(XMLConstants.XML_NS_PREFIX, XMLConstants.XML_NS_URI,
-        XMLConstants.XMLNS_ATTRIBUTE, XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "orcid",
-        "http://www.orcid.org/ns/orcid");
+    final Map<String, String> prefixToNS = new HashMap<>();
+    prefixToNS.put(XMLConstants.XML_NS_PREFIX, XMLConstants.XML_NS_URI);
+    prefixToNS.put(XMLConstants.XMLNS_ATTRIBUTE, XMLConstants.XMLNS_ATTRIBUTE_NS_URI);
+    prefixToNS.put("orcid", "http://www.orcid.org/ns/orcid");
 
     final XPath x = XPathFactory.newInstance().newXPath();
-
     x.setNamespaceContext(new NamespaceContext() {
       @Override
       public String getNamespaceURI(String prefix) {

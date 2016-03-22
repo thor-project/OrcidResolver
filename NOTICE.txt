@@ -23,7 +23,3 @@ The development of this software was made possible using:
 JUnit (4.12):
 	http://junit.org/
 	Eclipse Public License - v 1.0
-	
-Guava (19.0):
-	https://github.com/google/guava
-	Apache License 2.0
