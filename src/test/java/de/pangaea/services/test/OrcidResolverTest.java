@@ -74,4 +74,40 @@ public class OrcidResolverTest {
         r.resolve("Draut", "Amy", "10.1016/j.geomorph.2014.08.028", "10.2110/jsr.2013.79"));
   }
   
+  @Test
+  public void test5() throws Exception {
+    assertEquals("0000-0002-1900-4162",
+        r.resolve("Schindler", "UH", "10.1016/j.cageo.2008.02.023"));
+  }
+  
+  @Test
+  public void test6() throws Exception {
+    assertEquals("0000-0002-1900-4162",
+        r.resolve("Schindler", "U H", "10.1016/j.cageo.2008.02.023"));
+  }
+  
+  @Test
+  public void test7() throws Exception {
+    assertEquals("0000-0002-1900-4162",
+        r.resolve("Schindler", "U.H.", "10.1016/j.cageo.2008.02.023"));
+  }
+  
+  @Test
+  public void test8() throws Exception {
+    assertEquals("0000-0002-1900-4162",
+        r.resolve("Schindler", "U. H.", "10.1016/j.cageo.2008.02.023"));
+  }
+  
+  @Test
+  public void test9() throws Exception {
+    assertEquals("0000-0002-1900-4162",
+        r.resolve("Schindler", "U", "10.1016/j.cageo.2008.02.023"));
+  }
+  
+  @Test
+  public void test10() throws Exception {
+    assertEquals("0000-0002-1900-4162",
+        r.resolve("Schindler", "U.", "10.1016/j.cageo.2008.02.023"));
+  }
+  
 }

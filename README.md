@@ -1,9 +1,10 @@
-ORCID resolver and validator
+ORCID Resolver and Validator
 ============================
 
-The project includes a Java implementation for an approach to resolve the ORCID iD of a user given the first name,
-last name, and a list of DOIs for works claimed by the user at ORCID. The approach is reliable but does not
-guarantee that the returned ORCID iD is correct.
+The project includes a Java implementation for an approach to resolve the ORCID
+iD of a user given the first name, last name, and a list of DOIs for works 
+claimed by the user at ORCID. The approach is reliable but does not guarantee 
+that the returned ORCID iD is correct.
 
 The following lines demonstrate the usage of the resolver:
 
@@ -20,11 +21,12 @@ String id = r.resolve("Schindler", "Uwe",
 
 The code is also able to handle names with abbreviated first name. Those are
 detected if all letters of the first name are uppercase, e.g. "Schindler, UH"
-(short for "Schindler, Uwe Horst"). The query to orcid then uses wildcard
-on the first name.
+(short for "Schindler, Uwe Horst"). The query to ORCID then uses wildcard
+on the first name. The variants "U", "U H", "U.H.", "U. H.", and "U." are also 
+supported.
 
-The project also includes an ORCID iD validator that validates the checkum of the
-given ORCID. It can be used as follows:
+The project also includes an ORCID iD validator that validates the checkum of 
+the given ORCID. It can be used as follows:
 
 ```java
 // true

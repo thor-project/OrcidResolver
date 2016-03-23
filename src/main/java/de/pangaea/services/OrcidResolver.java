@@ -104,8 +104,11 @@ public class OrcidResolver {
     if (firstName != null && !firstName.trim().isEmpty()) {
       boolean first = true;
       for (final String part : firstName.split("\\s+")) {
-        if (part.matches("\\p{Lu}+")) { // only upper case
+        if (part.matches("[\\p{Lu}\\.{0,1}]+")) { // only upper case
           for (int i = 0, c = part.length(); i < c; i++) {
+            if (part.charAt(i) == '.') {
+              continue;
+            }
             sb.append(first ? "+" : " ").append(part.charAt(i)).append("*");
             first = false;
           }
