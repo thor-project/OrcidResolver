@@ -33,7 +33,6 @@ import java.util.Map;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
-import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
@@ -51,7 +50,8 @@ import org.xml.sax.SAXException;
  * Title: OrcidResolver
  * </p>
  * <p>
- * Description:
+ * Description: Returns Orcid after looking up name and a list of DOIs.
+ * <em>Please note:</em> Instances of this class are <b>not<b> thread safe!
  * </p>
  * <p>
  * Project: THOR
@@ -65,11 +65,62 @@ public class OrcidResolver {
   
   public static final String ORCID_API_URL = "http://pub.orcid.org/v1.2";
   public static final String ORCID_API_PATH = "/search/orcid-bio/";
-  public static final String ORCID_API_QUERY = "?start=0&rows=1&q.op=OR";
+  public static final String ORCID_API_QUERY = "?start=0&rows=1&q.op=OR&q=";
+
+  @SuppressWarnings("serial")
+  private static final BitSet SOLR_ESCAPE_CHARS = new BitSet() {{
+    final String escapes = "+-&|!(){}[]^\"~*?:\\/";
+    for (int i = 0, c = escapes.length(); i < c; i++) {
+      set(escapes.charAt(i));
+    }
+  }};
   
-  private static final DocumentBuilderFactory dbf;
-  private static final XPathExpression numFoundPath, orcidPath;
-  private static final BitSet escapeChars = new BitSet();
+  private final DocumentBuilderFactory dbf;
+  private final XPathExpression numFoundPath, orcidPath;
+  
+  public OrcidResolver() {
+    try {
+      dbf = DocumentBuilderFactory.newInstance();
+      dbf.setNamespaceAware(true);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to instantiate DocumentBuilderFactory, this may be caused by invalid XML configuration.", e);
+    }
+    
+    final Map<String, String> prefixToNS = new HashMap<>();
+    prefixToNS.put(XMLConstants.XML_NS_PREFIX, XMLConstants.XML_NS_URI);
+    prefixToNS.put(XMLConstants.XMLNS_ATTRIBUTE, XMLConstants.XMLNS_ATTRIBUTE_NS_URI);
+    prefixToNS.put("orcid", "http://www.orcid.org/ns/orcid");
+    
+    final XPath x = XPathFactory.newInstance().newXPath();
+    x.setNamespaceContext(new NamespaceContext() {
+      @Override
+      public String getNamespaceURI(String prefix) {
+        Objects.requireNonNull(prefix, "Namespace prefix cannot be null");
+        final String uri = prefixToNS.get(prefix);
+        if (uri == null) {
+          throw new IllegalArgumentException("Undeclared namespace prefix: " + prefix);
+        }
+        return uri;
+      }
+      
+      @Override
+      public String getPrefix(String namespaceURI) {
+        throw new UnsupportedOperationException();
+      }
+      
+      @Override
+      public Iterator<?> getPrefixes(String namespaceURI) {
+        throw new UnsupportedOperationException();
+      }
+    });
+    
+    try {
+      numFoundPath = x.compile("//orcid:orcid-search-results/@num-found");
+      orcidPath = x.compile("//orcid:orcid-profile[1]/orcid:orcid-identifier/orcid:path");
+    } catch (XPathException e) {
+      throw new RuntimeException("Failed to compile XPath, this may be caused by invalid XML configuration.", e);
+    }
+  }
   
   public String resolve(String lastName, String firstName, String... dois) throws IOException {
     return resolve(lastName, firstName, Arrays.asList(dois));
@@ -164,39 +215,37 @@ public class OrcidResolver {
   }
   
   private String getOrcid(String solrQuery) throws IOException {
-    try {
-      final URL url = new URL(ORCID_API_URL + ORCID_API_PATH + ORCID_API_QUERY + "&q="
-          + URLEncoder.encode(solrQuery, StandardCharsets.UTF_8.name()));
-      final URLConnection connection = url.openConnection();
-      connection.addRequestProperty("Accept", "application/orcid+xml");
-      try (final InputStream in = connection.getInputStream()) {
-        final DocumentBuilder builder;
-        synchronized (dbf) {
-          builder = dbf.newDocumentBuilder();
-        }
-        final Document doc = builder.parse(in);
-        final int numFound = ((Number) numFoundPath.evaluate(doc, XPathConstants.NUMBER)).intValue();
-        
-        if (numFound > 1) {
-          throw new IllegalStateException(
-              String.format(Locale.ENGLISH, "Obtained more than one ORCID [numFound = %d]", numFound));
-        }
-        
-        final String orcid = orcidPath.evaluate(doc).trim();
-        
-        if (!orcid.isEmpty()) {
-          return orcid;
-        }
-        
-        if (numFound == 1) {
-          throw new IllegalStateException("One ORCID result returned, but no id found in response.");
-        }
-        
-        return null;
-      }
+    final URL url = new URL(ORCID_API_URL + ORCID_API_PATH + ORCID_API_QUERY
+        + URLEncoder.encode(solrQuery, StandardCharsets.UTF_8.name()));
+    final URLConnection connection = url.openConnection();
+    connection.addRequestProperty("Accept", "application/orcid+xml");
+    
+    final int numFound;
+    final String orcid;
+    
+    try (final InputStream in = connection.getInputStream()) {
+      final Document doc = dbf.newDocumentBuilder().parse(in);
+      
+      numFound = ((Number) numFoundPath.evaluate(doc, XPathConstants.NUMBER)).intValue();
+      orcid = orcidPath.evaluate(doc).trim();
     } catch (SAXException | XPathExpressionException | ParserConfigurationException e) {
       throw new IllegalStateException("Failed to parse ORCID response.", e);
     }
+      
+    if (numFound > 1) {
+      throw new IllegalStateException(
+          String.format(Locale.ENGLISH, "Obtained more than one ORCID [numFound = %d]", numFound));
+    }
+    
+    if (!orcid.isEmpty()) {
+      return orcid;
+    }
+    
+    if (numFound == 1) {
+      throw new IllegalStateException("One ORCID result returned, but no id found in response.");
+    }
+    
+    return null;
   }
   
   private static String escapeSolrTerm(String term) {
@@ -204,7 +253,7 @@ public class OrcidResolver {
     
     for (int i = 0, c = term.length(); i < c; i++) {
       final char ch = term.charAt(i);
-      if (escapeChars.get(ch)) {
+      if (SOLR_ESCAPE_CHARS.get(ch)) {
         sb.append('\\').append(ch);
       } else {
         sb.append(ch);
@@ -212,57 +261,6 @@ public class OrcidResolver {
     }
     
     return sb.toString().replace("AND", "\\A\\N\\D").replace("OR", "\\O\\R");
-  }
-  
-  static {
-    try {
-      dbf = DocumentBuilderFactory.newInstance();
-      dbf.setNamespaceAware(true);
-    } catch (Exception e) {
-      throw new Error(
-          "Failed to instantiate DocumentBuilderFactory, this may be caused by invalid XML configuration.",
-          e);
-    }
-    
-    final Map<String, String> prefixToNS = new HashMap<>();
-    prefixToNS.put(XMLConstants.XML_NS_PREFIX, XMLConstants.XML_NS_URI);
-    prefixToNS.put(XMLConstants.XMLNS_ATTRIBUTE, XMLConstants.XMLNS_ATTRIBUTE_NS_URI);
-    prefixToNS.put("orcid", "http://www.orcid.org/ns/orcid");
-    
-    final XPath x = XPathFactory.newInstance().newXPath();
-    x.setNamespaceContext(new NamespaceContext() {
-      @Override
-      public String getNamespaceURI(String prefix) {
-        Objects.requireNonNull(prefix, "Namespace prefix cannot be null");
-        final String uri = prefixToNS.get(prefix);
-        if (uri == null) {
-          throw new IllegalArgumentException("Undeclared namespace prefix: " + prefix);
-        }
-        return uri;
-      }
-      
-      @Override
-      public String getPrefix(String namespaceURI) {
-        throw new UnsupportedOperationException();
-      }
-      
-      @Override
-      public Iterator<?> getPrefixes(String namespaceURI) {
-        throw new UnsupportedOperationException();
-      }
-    });
-    
-    try {
-      numFoundPath = x.compile("//orcid:orcid-search-results/@num-found");
-      orcidPath = x.compile("//orcid:orcid-profile[1]/orcid:orcid-identifier/orcid:path");
-    } catch (XPathException e) {
-      throw new Error("Failed to compile XPath, this may be caused by invalid XML configuration.", e);
-    }
-    
-    final String escapes = "+-&|!(){}[]^\"~*?:\\/";
-    for (int i = 0, c = escapes.length(); i < c; i++) {
-      escapeChars.set(escapes.charAt(i));
-    }
   }
   
 }
