@@ -34,11 +34,8 @@ import de.pangaea.services.OrcidResolver;
  * Project: THOR
  * </p>
  * <p>
- * Copyright: Copyright (C) 2016
+ * Copyright: PANGAEA
  * </p>
- * 
- * @author Uwe Schindler
- * @author Markus Stocker
  */
 
 public class OrcidResolverTest {

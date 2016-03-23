@@ -33,11 +33,8 @@ import de.pangaea.services.OrcidValidator;
  * Project: THOR
  * </p>
  * <p>
- * Copyright: Copyright (C) 2016
+ * Copyright: PANGAEA
  * </p>
- * 
- * @author Uwe Schindler
- * @author Markus Stocker
  */
 
 public class OrcidValidatorTest {
