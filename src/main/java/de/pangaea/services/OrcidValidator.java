@@ -41,35 +41,35 @@ import java.util.regex.Pattern;
  */
 
 public class OrcidValidator {
-
-	private static final Pattern orcidPattern = Pattern
-			.compile("\\d\\d\\d\\d\\-\\d\\d\\d\\d\\-\\d\\d\\d\\d\\-\\d\\d\\d[X\\d]");
-
-	public static boolean isValid(String orcid) {
-		if (orcid == null)
-			return false;
-
-		if (!orcidPattern.matcher(orcid).matches())
-			return false;
-
-		final int last = orcid.length() - 1;
-		int total = 0;
-
-		for (int i = 0; i < last; i++) {
-			final char ch = orcid.charAt(i);
-			if (ch != '-') {
-				total = (total + ch - '0') * 2;
-			}
-		}
-
-		final int remainder = total % 11;
-		final int result = (12 - remainder) % 11;
-		char lastDigit = (result == 10) ? 'X' : (char) ('0' + result);
-
-		if (orcid.charAt(last) != lastDigit)
-			return false;
-
-		return true;
-	}
-
+  
+  private static final Pattern orcidPattern = Pattern
+      .compile("\\d\\d\\d\\d\\-\\d\\d\\d\\d\\-\\d\\d\\d\\d\\-\\d\\d\\d[X\\d]");
+  
+  public static boolean isValid(String orcid) {
+    if (orcid == null)
+      return false;
+    
+    if (!orcidPattern.matcher(orcid).matches())
+      return false;
+    
+    final int last = orcid.length() - 1;
+    int total = 0;
+    
+    for (int i = 0; i < last; i++) {
+      final char ch = orcid.charAt(i);
+      if (ch != '-') {
+        total = (total + ch - '0') * 2;
+      }
+    }
+    
+    final int remainder = total % 11;
+    final int result = (12 - remainder) % 11;
+    char lastDigit = (result == 10) ? 'X' : (char) ('0' + result);
+    
+    if (orcid.charAt(last) != lastDigit)
+      return false;
+    
+    return true;
+  }
+  
 }
