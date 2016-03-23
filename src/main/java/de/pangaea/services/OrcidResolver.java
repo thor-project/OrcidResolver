@@ -28,6 +28,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 
 import javax.xml.XMLConstants;
@@ -35,6 +36,7 @@ import javax.xml.namespace.NamespaceContext;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathException;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
@@ -65,7 +67,7 @@ public class OrcidResolver {
   public static final String ORCID_API_QUERY = "?start=0&rows=1&q.op=OR";
   
   private static final DocumentBuilderFactory dbf;
-  private static final XPathExpression orcidPath;
+  private static final XPathExpression numFoundPath, orcidPath;
   private static final BitSet escapeChars = new BitSet();
   
   public String resolve(String lastName, String firstName, String... dois) throws IOException {
@@ -85,7 +87,7 @@ public class OrcidResolver {
     
     final String orcid = getOrcid(solrQuery);
     
-    if (orcid.isEmpty()) {
+    if (orcid == null) {
       // no ORCID found
       return null;
     }
@@ -169,7 +171,20 @@ public class OrcidResolver {
       try (final InputStream in = connection.getInputStream()) {
         synchronized (dbf) {
           final Document doc = dbf.newDocumentBuilder().parse(in);
-          return orcidPath.evaluate(doc).trim();
+          final int numFound = ((Number) numFoundPath.evaluate(doc, XPathConstants.NUMBER)).intValue();
+          
+          if (numFound > 1) {
+            throw new IllegalStateException(
+                String.format(Locale.ENGLISH, "Obtained more than one ORCID [numFound = %d]", numFound));
+          }
+          
+          final String orcid = orcidPath.evaluate(doc).trim();
+          
+          if (!orcid.isEmpty()) {
+            return orcid;
+          }
+          
+          return null;
         }
       }
     } catch (SAXException | XPathExpressionException | ParserConfigurationException e) {
@@ -231,6 +246,7 @@ public class OrcidResolver {
     });
     
     try {
+      numFoundPath = x.compile("//orcid:orcid-search-results/@num-found");
       orcidPath = x.compile("//orcid:orcid-profile[1]/orcid:orcid-identifier/orcid:path");
     } catch (XPathException e) {
       throw new Error("Failed to compile XPath, this may be caused by invalid XML configuration.", e);
