@@ -33,6 +33,7 @@ import java.util.Map;
 
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
+import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
@@ -169,23 +170,25 @@ public class OrcidResolver {
       final URLConnection connection = url.openConnection();
       connection.addRequestProperty("Accept", "application/orcid+xml");
       try (final InputStream in = connection.getInputStream()) {
+        final DocumentBuilder builder;
         synchronized (dbf) {
-          final Document doc = dbf.newDocumentBuilder().parse(in);
-          final int numFound = ((Number) numFoundPath.evaluate(doc, XPathConstants.NUMBER)).intValue();
-          
-          if (numFound > 1) {
-            throw new IllegalStateException(
-                String.format(Locale.ENGLISH, "Obtained more than one ORCID [numFound = %d]", numFound));
-          }
-          
-          final String orcid = orcidPath.evaluate(doc).trim();
-          
-          if (!orcid.isEmpty()) {
-            return orcid;
-          }
-          
-          return null;
+          builder = dbf.newDocumentBuilder();
         }
+        final Document doc = builder.parse(in);
+        final int numFound = ((Number) numFoundPath.evaluate(doc, XPathConstants.NUMBER)).intValue();
+        
+        if (numFound > 1) {
+          throw new IllegalStateException(
+              String.format(Locale.ENGLISH, "Obtained more than one ORCID [numFound = %d]", numFound));
+        }
+        
+        final String orcid = orcidPath.evaluate(doc).trim();
+        
+        if (!orcid.isEmpty()) {
+          return orcid;
+        }
+        
+        return null;
       }
     } catch (SAXException | XPathExpressionException | ParserConfigurationException e) {
       throw new IllegalStateException("Failed to parse ORCID response.", e);
