@@ -63,177 +63,183 @@ import org.xml.sax.SAXException;
 
 public class OrcidResolver {
 
-  public static final String ORCID_API_URL = "http://pub.orcid.org/v1.2";
-  public static final String ORCID_API_PATH = "/search/orcid-bio/";
-  public static final String ORCID_API_QUERY = "?start=0&rows=1&q.op=OR";
+	public static final String ORCID_API_URL = "http://pub.orcid.org/v1.2";
+	public static final String ORCID_API_PATH = "/search/orcid-bio/";
+	public static final String ORCID_API_QUERY = "?start=0&rows=1&q.op=OR";
 
-  private static final DocumentBuilderFactory dbf;
-  private static final XPathExpression orcidPath;
-  private static final BitSet escapeChars = new BitSet();
+	private static final DocumentBuilderFactory dbf;
+	private static final XPathExpression orcidPath;
+	private static final BitSet escapeChars = new BitSet();
 
-  public String resolve(String lastName, String firstName, String... dois) throws IOException {
-    return resolve(lastName, firstName, Arrays.asList(dois));
-  }
-  
-  public String resolve(String lastName, String firstName, Collection<String> dois) throws IOException {
-    Objects.requireNonNull(lastName, "last name must not be null");
-    Objects.requireNonNull(firstName, "first name must not be null");
-    Objects.requireNonNull(dois, "dois name must not be null");
-    if (dois.isEmpty()) {
-      throw new IllegalArgumentException("dois must contain at least one DOI");
-    }
+	public String resolve(String lastName, String firstName, String... dois) throws IOException {
+		return resolve(lastName, firstName, Arrays.asList(dois));
+	}
 
-    final String solrQuery = createSolrQuery(lastName, firstName, dois);
+	public String resolve(String lastName, String firstName, Collection<String> dois) throws IOException {
+		Objects.requireNonNull(lastName, "last name must not be null");
+		Objects.requireNonNull(firstName, "first name must not be null");
+		Objects.requireNonNull(dois, "dois name must not be null");
 
-    final String ret;
-    try {
-      final URL url = new URL(ORCID_API_URL + ORCID_API_PATH + ORCID_API_QUERY + "&q="
-          + URLEncoder.encode(solrQuery, StandardCharsets.UTF_8.name()));
-      final URLConnection connection = url.openConnection();
-      connection.addRequestProperty("Accept", "application/orcid+xml");
-      try (final InputStream in = connection.getInputStream()) {
-        synchronized(dbf) {
-          final Document doc = dbf.newDocumentBuilder().parse(in);
-          ret = orcidPath.evaluate(doc).trim();
-        }
-      }
-    } catch (SAXException | XPathExpressionException | ParserConfigurationException e) {
-      throw new IllegalStateException("Failed to parse ORCID response.", e);
-    }
+		if (dois.isEmpty()) {
+			throw new IllegalArgumentException("dois must contain at least one DOI");
+		}
 
-    if (ret.isEmpty()) {
-      // no ORCID found
-      return null;
-    }
+		final String solrQuery = createSolrQuery(lastName, firstName, dois);
 
-    if (!OrcidValidator.isValid(ret)) {
-      throw new IllegalStateException("Invalid ORCID returned by service: " + ret);
-    }
+		final String orcid = getOrcid(solrQuery);
 
-    return ret;
-  }
+		if (orcid.isEmpty()) {
+			// no ORCID found
+			return null;
+		}
 
-  private String createSolrQuery(String lastName, String firstName, Collection<String> dois) {
-    final String firstNamePattern;
-    final StringBuilder sb = new StringBuilder();
+		if (!OrcidValidator.isValid(orcid)) {
+			throw new IllegalStateException("Invalid ORCID returned by service: " + orcid);
+		}
 
-    if (firstName != null && !firstName.trim().isEmpty()) {
-      boolean first = true;
-      for (final String part : firstName.split("\\s+")) {
-        if (part.matches("\\p{Lu}+")) { // only upper case
-          for (int i = 0, c = part.length(); i < c; i++) {
-            sb.append(first ? "+" : " ").append(part.charAt(i)).append("*");
-            first = false;
-          }
-        } else {
-          sb.append(first ? "+" : " ").append(escapeSolrTerm(part));
-          first = false;
-        }
-      }
-      firstNamePattern = sb.toString().trim();
-    } else {
-      firstNamePattern = "";
-    }
+		return orcid;
+	}
 
-    final String lastNamePattern = escapeSolrTerm(lastName.trim());
-    final StringBuilder solrQuery = new StringBuilder();
+	private String createSolrQuery(String lastName, String firstName, Collection<String> dois) {
+		final String firstNamePattern;
+		final StringBuilder sb = new StringBuilder();
 
-    solrQuery.append("+((");
-    solrQuery.append("+family-name:\"").append(lastNamePattern).append('"');
-    if (!firstNamePattern.isEmpty()) {
-      solrQuery.append(" +given-names:(").append(firstNamePattern).append(')');
-    }
-    solrQuery.append(") credit-name:(");
-    solrQuery.append("+\"").append(lastNamePattern).append('"');
-    if (!firstNamePattern.isEmpty()) {
-      solrQuery.append(" +(").append(firstNamePattern).append(')');
-    }
-    solrQuery.append(") other-names:(");
-    solrQuery.append("+\"").append(lastNamePattern).append('"');
-    if (!firstNamePattern.isEmpty()) {
-      solrQuery.append(" +(").append(firstNamePattern).append(')');
-    }
-    solrQuery.append("))");
+		if (firstName != null && !firstName.trim().isEmpty()) {
+			boolean first = true;
+			for (final String part : firstName.split("\\s+")) {
+				if (part.matches("\\p{Lu}+")) { // only upper case
+					for (int i = 0, c = part.length(); i < c; i++) {
+						sb.append(first ? "+" : " ").append(part.charAt(i)).append("*");
+						first = false;
+					}
+				} else {
+					sb.append(first ? "+" : " ").append(escapeSolrTerm(part));
+					first = false;
+				}
+			}
+			firstNamePattern = sb.toString().trim();
+		} else {
+			firstNamePattern = "";
+		}
 
-    solrQuery.append(" +digital-object-ids:(");
+		final String lastNamePattern = escapeSolrTerm(lastName.trim());
+		final StringBuilder solrQuery = new StringBuilder();
 
-    boolean firstDoi = true;
-    for (final String doi : dois) {
-      if (!firstDoi) {
-        solrQuery.append(' ');
-      }
-      solrQuery.append('"').append(escapeSolrTerm(doi)).append('"');
-      if (solrQuery.length() > 768) {
-        break;
-      }
-    }
+		solrQuery.append("+((");
+		solrQuery.append("+family-name:\"").append(lastNamePattern).append('"');
+		if (!firstNamePattern.isEmpty()) {
+			solrQuery.append(" +given-names:(").append(firstNamePattern).append(')');
+		}
+		solrQuery.append(") credit-name:(");
+		solrQuery.append("+\"").append(lastNamePattern).append('"');
+		if (!firstNamePattern.isEmpty()) {
+			solrQuery.append(" +(").append(firstNamePattern).append(')');
+		}
+		solrQuery.append(") other-names:(");
+		solrQuery.append("+\"").append(lastNamePattern).append('"');
+		if (!firstNamePattern.isEmpty()) {
+			solrQuery.append(" +(").append(firstNamePattern).append(')');
+		}
+		solrQuery.append("))");
 
-    solrQuery.append(')');
+		solrQuery.append(" +digital-object-ids:(");
 
-    return solrQuery.toString();
-  }
+		boolean firstDoi = true;
+		for (final String doi : dois) {
+			if (!firstDoi) {
+				solrQuery.append(' ');
+			}
+			solrQuery.append('"').append(escapeSolrTerm(doi)).append('"');
+			if (solrQuery.length() > 768) {
+				break;
+			}
+		}
 
-  private static String escapeSolrTerm(String term) {
-    final StringBuilder sb = new StringBuilder();
-    
-    for (int i = 0, c = term.length(); i < c; i++) {
-      final char ch = term.charAt(i);
-      if (escapeChars.get(ch)) {
-        sb.append('\\').append(ch);
-      } else {
-        sb.append(ch);
-      }
-    }
-    
-    return sb.toString().replace("AND", "\\A\\N\\D").replace("OR", "\\O\\R");
-  }
+		solrQuery.append(')');
 
-  static {
-    try {
-      dbf = DocumentBuilderFactory.newInstance();
-      dbf.setNamespaceAware(true);
-    } catch (Exception e) {
-      throw new Error("Failed to instantiate DocumentBuilderFactory, this may be caused by invalid XML configuration.", e);
-    }
+		return solrQuery.toString();
+	}
 
-    final Map<String, String> prefixToNS = new HashMap<>();
-    prefixToNS.put(XMLConstants.XML_NS_PREFIX, XMLConstants.XML_NS_URI);
-    prefixToNS.put(XMLConstants.XMLNS_ATTRIBUTE, XMLConstants.XMLNS_ATTRIBUTE_NS_URI);
-    prefixToNS.put("orcid", "http://www.orcid.org/ns/orcid");
+	private String getOrcid(String solrQuery) throws IOException {
+		try {
+			final URL url = new URL(ORCID_API_URL + ORCID_API_PATH + ORCID_API_QUERY + "&q="
+					+ URLEncoder.encode(solrQuery, StandardCharsets.UTF_8.name()));
+			final URLConnection connection = url.openConnection();
+			connection.addRequestProperty("Accept", "application/orcid+xml");
+			try (final InputStream in = connection.getInputStream()) {
+				synchronized (dbf) {
+					final Document doc = dbf.newDocumentBuilder().parse(in);
+					return orcidPath.evaluate(doc).trim();
+				}
+			}
+		} catch (SAXException | XPathExpressionException | ParserConfigurationException e) {
+			throw new IllegalStateException("Failed to parse ORCID response.", e);
+		}
+	}
 
-    final XPath x = XPathFactory.newInstance().newXPath();
-    x.setNamespaceContext(new NamespaceContext() {
-      @Override
-      public String getNamespaceURI(String prefix) {
-        Objects.requireNonNull(prefix, "Namespace prefix cannot be null");
-        final String uri = prefixToNS.get(prefix);
-        if (uri == null) {
-          throw new IllegalArgumentException("Undeclared namespace prefix: " + prefix);
-        }
-        return uri;
-      }
+	private static String escapeSolrTerm(String term) {
+		final StringBuilder sb = new StringBuilder();
 
-      @Override
-      public String getPrefix(String namespaceURI) {
-        throw new UnsupportedOperationException();
-      }
+		for (int i = 0, c = term.length(); i < c; i++) {
+			final char ch = term.charAt(i);
+			if (escapeChars.get(ch)) {
+				sb.append('\\').append(ch);
+			} else {
+				sb.append(ch);
+			}
+		}
 
-      @Override
-      public Iterator<?> getPrefixes(String namespaceURI) {
-        throw new UnsupportedOperationException();
-      }
-    });
+		return sb.toString().replace("AND", "\\A\\N\\D").replace("OR", "\\O\\R");
+	}
 
-    try {
-      orcidPath = x.compile("//orcid:orcid-profile[1]/orcid:orcid-identifier/orcid:path");
-    } catch (XPathException e) {
-      throw new Error("Failed to compile XPath, this may be caused by invalid XML configuration.", e);
-    }
+	static {
+		try {
+			dbf = DocumentBuilderFactory.newInstance();
+			dbf.setNamespaceAware(true);
+		} catch (Exception e) {
+			throw new Error(
+					"Failed to instantiate DocumentBuilderFactory, this may be caused by invalid XML configuration.",
+					e);
+		}
 
-    final String escapes = "+-&|!(){}[]^\"~*?:\\/";
-    for (int i = 0, c = escapes.length(); i < c; i++) {
-      escapeChars.set(escapes.charAt(i));
-    }
-  }
+		final Map<String, String> prefixToNS = new HashMap<>();
+		prefixToNS.put(XMLConstants.XML_NS_PREFIX, XMLConstants.XML_NS_URI);
+		prefixToNS.put(XMLConstants.XMLNS_ATTRIBUTE, XMLConstants.XMLNS_ATTRIBUTE_NS_URI);
+		prefixToNS.put("orcid", "http://www.orcid.org/ns/orcid");
+
+		final XPath x = XPathFactory.newInstance().newXPath();
+		x.setNamespaceContext(new NamespaceContext() {
+			@Override
+			public String getNamespaceURI(String prefix) {
+				Objects.requireNonNull(prefix, "Namespace prefix cannot be null");
+				final String uri = prefixToNS.get(prefix);
+				if (uri == null) {
+					throw new IllegalArgumentException("Undeclared namespace prefix: " + prefix);
+				}
+				return uri;
+			}
+
+			@Override
+			public String getPrefix(String namespaceURI) {
+				throw new UnsupportedOperationException();
+			}
+
+			@Override
+			public Iterator<?> getPrefixes(String namespaceURI) {
+				throw new UnsupportedOperationException();
+			}
+		});
+
+		try {
+			orcidPath = x.compile("//orcid:orcid-profile[1]/orcid:orcid-identifier/orcid:path");
+		} catch (XPathException e) {
+			throw new Error("Failed to compile XPath, this may be caused by invalid XML configuration.", e);
+		}
+
+		final String escapes = "+-&|!(){}[]^\"~*?:\\/";
+		for (int i = 0, c = escapes.length(); i < c; i++) {
+			escapeChars.set(escapes.charAt(i));
+		}
+	}
 
 }
