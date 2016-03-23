@@ -188,6 +188,10 @@ public class OrcidResolver {
           return orcid;
         }
         
+        if (numFound == 1) {
+          throw new IllegalStateException("One ORCID result returned, but no id found in response.");
+        }
+        
         return null;
       }
     } catch (SAXException | XPathExpressionException | ParserConfigurationException e) {
