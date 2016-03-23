@@ -25,7 +25,7 @@ detected if all letters of the first name are uppercase, e.g. "Schindler, UH"
 on the first name. The variants "U", "U H", "U.H.", "U. H.", and "U." are also 
 supported.
 
-The project also includes an ORCID iD validator that validates the checkum of 
+The project also includes an ORCID iD validator that validates the checksum of 
 the given ORCID. It can be used as follows:
 
 ```java
