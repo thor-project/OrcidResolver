@@ -63,8 +63,8 @@ import org.xml.sax.SAXException;
 
 public class OrcidResolver {
   
-  public static final String ORCID_API_URL = "http://pub.orcid.org/v1.2";
-  public static final String ORCID_API_PATH = "/search/orcid-bio/";
+  public static final String ORCID_API_URL = "https://pub.orcid.org/v2.1";
+  public static final String ORCID_API_PATH = "/search";
   public static final String ORCID_API_QUERY = "?start=0&rows=1&q.op=OR&q=";
 
   @SuppressWarnings("serial")
@@ -89,7 +89,8 @@ public class OrcidResolver {
     final Map<String, String> prefixToNS = new HashMap<>();
     prefixToNS.put(XMLConstants.XML_NS_PREFIX, XMLConstants.XML_NS_URI);
     prefixToNS.put(XMLConstants.XMLNS_ATTRIBUTE, XMLConstants.XMLNS_ATTRIBUTE_NS_URI);
-    prefixToNS.put("orcid", "http://www.orcid.org/ns/orcid");
+    prefixToNS.put("search", "http://www.orcid.org/ns/search");
+    prefixToNS.put("common", "http://www.orcid.org/ns/common");
     
     final XPath x = XPathFactory.newInstance().newXPath();
     x.setNamespaceContext(new NamespaceContext() {
@@ -115,8 +116,8 @@ public class OrcidResolver {
     });
     
     try {
-      numFoundPath = x.compile("//orcid:orcid-search-results/@num-found");
-      orcidPath = x.compile("//orcid:orcid-profile[1]/orcid:orcid-identifier/orcid:path");
+      numFoundPath = x.compile("/search:search/@num-found");
+      orcidPath = x.compile("/search:search/search:result[1]/common:orcid-identifier/common:path");
     } catch (XPathException e) {
       throw new RuntimeException("Failed to compile XPath, this may be caused by invalid XML configuration.", e);
     }
